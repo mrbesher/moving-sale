@@ -134,6 +134,11 @@
             content: "Reserved";
         }
 
+        .card.future .image img {
+            filter: grayscale(70%);
+            opacity: 0.6;
+        }
+
         .content {
             padding: 16px;
             flex: 1;
@@ -329,20 +334,20 @@
 
             availableItems.sort(sortBy);
 
-            if (futureItems.length > 0) {
-                const title = document.createElement("h2");
-                title.className = "section-title";
-                title.textContent = "Future Availability";
-                gridEl.appendChild(title);
-                futureItems.forEach(item => renderItem(item, data));
-            }
-
             if (availableItems.length > 0) {
                 const title = document.createElement("h2");
                 title.className = "section-title";
                 title.textContent = "Available Now";
                 gridEl.appendChild(title);
                 availableItems.forEach(item => renderItem(item, data));
+            }
+
+            if (futureItems.length > 0) {
+                const title = document.createElement("h2");
+                title.className = "section-title";
+                title.textContent = "Future Availability";
+                gridEl.appendChild(title);
+                futureItems.forEach(item => renderItem(item, data));
             }
         }
 
@@ -356,7 +361,7 @@
             const isReserved = item.status === "reserved";
 
             const card = document.createElement("article");
-            card.className = `card ${isSold ? "sold" : ""} ${isReserved ? "reserved" : ""}`;
+            card.className = `card ${isSold ? "sold" : ""} ${isReserved ? "reserved" : ""} ${isFuture ? "future" : ""}`;
 
             const availabilityHtml = isFuture
                 ? `<p class="availability future">Available from ${item.date}</p>`
