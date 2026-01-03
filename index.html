@@ -389,6 +389,9 @@
             const availableItems = [];
 
             data.items.forEach(item => {
+                const isSold = item.status === "sold";
+                if (isSold && !data.isAdmin) return;
+
                 const itemDate = item.date ? new Date(item.date) : null;
                 const isFuture = itemDate && itemDate > today;
 
