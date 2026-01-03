@@ -223,6 +223,22 @@
             display: none;
         }
 
+        .section-title {
+            grid-column: 1 / -1;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-light);
+            margin: 16px 0 8px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .section-title:first-child {
+            border-top: none;
+            margin-top: 0;
+            padding-top: 0;
+        }
+
         @media (max-width: 480px) {
             body {
                 padding: 12px;
@@ -285,52 +301,105 @@
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
+            const futureItems = [];
+            const availableItems = [];
+
             data.items.forEach(item => {
                 const itemDate = item.date ? new Date(item.date) : null;
                 const isFuture = itemDate && itemDate > today;
-                const isSold = item.status === "sold";
-                const isReserved = item.status === "reserved";
 
-                const card = document.createElement("article");
-                card.className = `card ${isSold ? "sold" : ""} ${isReserved ? "reserved" : ""}`;
-
-                const availabilityHtml = isFuture
-                    ? `<p class="availability future">Available from ${item.date}</p>`
-                    : `<p class="availability available">Available now</p>`;
-
-                const descriptionHtml = item.description
-                    ? `<p class="description">${escapeHtml(item.description)}</p>`
-                    : "";
-
-                const overlayHtml = (isSold || isReserved) ? `<div class="overlay"></div>` : "";
-
-                let actionsHtml = "";
-                if (!isSold) {
-                    actionsHtml = `
-                        <div class="actions">
-                            <button class="btn btn-whatsapp" onclick="contact('${item.id}', '${escapeHtml(item.name)}', 'wa', '${data.contact.whatsapp}')">WhatsApp</button>
-                            <button class="btn btn-telegram" onclick="contact('${item.id}', '${escapeHtml(item.name)}', 'tg', '${data.contact.telegram}')">Telegram</button>
-                            ${data.isAdmin ? `<button class="btn btn-admin" onclick="markSold('${item.id}', '${escapeHtml(item.name)}')">Mark Sold</button>` : ""}
-                        </div>
-                    `;
+                if (isFuture) {
+                    futureItems.push(item);
+                } else {
+                    availableItems.push(item);
                 }
+            });
 
-                card.innerHTML = `
-                    <div class="image">
-                        <img src="assets/${item.imageUrl}" alt="${escapeHtml(item.name)}" loading="lazy">
-                        <span class="price">${formatPrice(item.price)}€</span>
-                        ${overlayHtml}
-                    </div>
-                    <div class="content">
-                        <h2 class="title">${escapeHtml(item.name)}</h2>
-                        ${descriptionHtml}
-                        ${availabilityHtml}
-                        ${actionsHtml}
+            const sortBy = (a, b) => {
+                const priceDiff = parseFloat(b.price) - parseFloat(a.price);
+                if (priceDiff !== 0) return priceDiff;
+                return a.id.localeCompare(b.id);
+            };
+
+            futureItems.sort((a, b) => {
+                const dateDiff = new Date(a.date) - new Date(b.date);
+                if (dateDiff !== 0) return dateDiff;
+                return sortBy(a, b);
+            });
+
+            availableItems.sort(sortBy);
+
+            if (futureItems.length > 0) {
+                const title = document.createElement("h2");
+                title.className = "section-title";
+                title.textContent = "Future Availability";
+                gridEl.appendChild(title);
+                futureItems.forEach(item => renderItem(item, data));
+            }
+
+            if (availableItems.length > 0) {
+                const title = document.createElement("h2");
+                title.className = "section-title";
+                title.textContent = "Available Now";
+                gridEl.appendChild(title);
+                availableItems.forEach(item => renderItem(item, data));
+            }
+        }
+
+        function renderItem(item, data) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const itemDate = item.date ? new Date(item.date) : null;
+            const isFuture = itemDate && itemDate > today;
+            const isSold = item.status === "sold";
+            const isReserved = item.status === "reserved";
+
+            const card = document.createElement("article");
+            card.className = `card ${isSold ? "sold" : ""} ${isReserved ? "reserved" : ""}`;
+
+            const availabilityHtml = isFuture
+                ? `<p class="availability future">Available from ${item.date}</p>`
+                : `<p class="availability available">Available now</p>`;
+
+            const descriptionHtml = item.description
+                ? `<p class="description">${escapeHtml(item.description)}</p>`
+                : "";
+
+            const overlayHtml = (isSold || isReserved) ? `<div class="overlay"></div>` : "";
+
+            let actionsHtml = "";
+            if (isReserved && data.isAdmin) {
+                actionsHtml = `
+                    <div class="actions">
+                        <button class="btn btn-admin" onclick="cancelReservation('${item.id}', '${escapeHtml(item.name)}')">Cancel Reservation</button>
                     </div>
                 `;
+            } else if (!isSold) {
+                actionsHtml = `
+                    <div class="actions">
+                        <button class="btn btn-whatsapp" onclick="contact('${item.id}', '${escapeHtml(item.name)}', 'wa', '${data.contact.whatsapp}')">WhatsApp</button>
+                        <button class="btn btn-telegram" onclick="contact('${item.id}', '${escapeHtml(item.name)}', 'tg', '${data.contact.telegram}')">Telegram</button>
+                        ${data.isAdmin ? `<button class="btn btn-admin" onclick="markSold('${item.id}', '${escapeHtml(item.name)}')">Mark Sold</button>` : ""}
+                    </div>
+                `;
+            }
 
-                gridEl.appendChild(card);
-            });
+            card.innerHTML = `
+                <div class="image">
+                    <img src="assets/${item.imageUrl}" alt="${escapeHtml(item.name)}" loading="lazy">
+                    <span class="price">${formatPrice(item.price)}€</span>
+                    ${overlayHtml}
+                </div>
+                <div class="content">
+                    <h2 class="title">${escapeHtml(item.name)}</h2>
+                    ${descriptionHtml}
+                    ${availabilityHtml}
+                    ${actionsHtml}
+                </div>
+            `;
+
+            gridEl.appendChild(card);
         }
 
         function escapeHtml(str) {
@@ -359,6 +428,12 @@
         async function markSold(id, name) {
             if (!confirm(`Mark "${name}" as sold?`)) return;
             await fetch(`${API_URL}?token=${token}&action=sell&id=${id}`, { method: "POST" });
+            location.reload();
+        }
+
+        async function cancelReservation(id, name) {
+            if (!confirm(`Cancel reservation for "${name}"?`)) return;
+            await fetch(`${API_URL}?token=${token}&action=cancel&id=${id}`, { method: "POST" });
             location.reload();
         }
 
