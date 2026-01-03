@@ -463,6 +463,7 @@
             } else if (isReserved && data.isAdmin) {
                 actionsHtml = `
                     <div class="actions">
+                        <button class="btn btn-admin" data-no-select onclick="markSold('${item.id}', '${escapeHtml(item.name)}')">Mark Sold</button>
                         <button class="btn btn-admin" data-no-select onclick="cancelReservation('${item.id}', '${escapeHtml(item.name)}')">Cancel Reservation</button>
                     </div>
                 `;
@@ -488,6 +489,7 @@
 
             card.addEventListener("click", (e) => {
                 if (e.target.closest("[data-no-select]")) return;
+                if (isSold || isReserved) return;
                 toggleSelection(item.id, card);
             });
 
