@@ -467,13 +467,9 @@
                     </div>
                 `;
             } else if (!isSold) {
-                actionsHtml = `
-                    <div class="actions">
-                        <button class="btn btn-whatsapp" data-no-select onclick="contact('${item.id}', '${escapeHtml(item.name)}', 'wa', '${data.contact.whatsapp}')">WhatsApp</button>
-                        <button class="btn btn-telegram" data-no-select onclick="contact('${item.id}', '${escapeHtml(item.name)}', 'tg', '${data.contact.telegram}')">Telegram</button>
-                        ${data.isAdmin ? `<button class="btn btn-admin" data-no-select onclick="markSold('${item.id}', '${escapeHtml(item.name)}')">Mark Sold</button>` : ""}
-                    </div>
-                `;
+                actionsHtml = data.isAdmin
+                    ? `<div class="actions"><button class="btn btn-admin" data-no-select onclick="markSold('${item.id}', '${escapeHtml(item.name)}')">Mark Sold</button></div>`
+                    : "";
             }
 
             card.innerHTML = `
@@ -549,7 +545,7 @@
             location.reload();
         }
 
-        async function contact(id, name, type, contactInfo) {
+        async function contactItem(id, name, type, contactInfo) {
             await fetch(`${API_URL}?token=${token}&action=reserve&id=${id}`, { method: "POST" });
             location.reload();
 
