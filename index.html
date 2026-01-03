@@ -260,6 +260,52 @@
             padding-top: 0;
         }
 
+        .card {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .card.selected {
+            outline: 3px solid var(--accent);
+            outline-offset: -3px;
+        }
+
+        .selection-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 16px;
+            box-shadow: 0 -2px 12px rgba(0,0,0,0.12);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            transform: translateY(100%);
+            transition: transform 0.2s ease;
+            z-index: 100;
+        }
+
+        .selection-bar.visible {
+            transform: translateY(0);
+        }
+
+        .selection-bar .actions {
+            display: flex;
+            gap: 12px;
+            margin: 0;
+        }
+
+        .selection-bar .actions .btn {
+            padding: 12px 24px;
+            font-size: 0.95rem;
+        }
+
+        .selection-count {
+            font-weight: 500;
+        }
+
         @media (max-width: 480px) {
             body {
                 padding: 12px;
@@ -280,6 +326,14 @@
         <div id="loading" class="loading">Loading...</div>
         <div id="error" class="error hidden"></div>
         <div id="grid" class="grid hidden"></div>
+
+        <div id="selectionBar" class="selection-bar">
+            <span class="selection-count">0 selected</span>
+            <div class="actions">
+                <button class="btn btn-whatsapp" onclick="contactMultiple('wa')">WhatsApp</button>
+                <button class="btn btn-telegram" onclick="contactMultiple('tg')">Telegram</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -288,6 +342,12 @@
         const token = params.get("token");
 
         const loadingEl = document.getElementById("loading");
+        const selectionBarEl = document.getElementById("selectionBar");
+        const selectionCountEl = selectionBarEl.querySelector(".selection-count");
+
+        let selectedItems = new Set();
+        let allItems = [];
+        let contact = {};
         const errorEl = document.getElementById("error");
         const gridEl = document.getElementById("grid");
 
@@ -318,6 +378,9 @@
         function render(data) {
             loadingEl.classList.add("hidden");
             gridEl.classList.remove("hidden");
+
+            allItems = data.items;
+            contact = data.contact;
 
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -378,6 +441,7 @@
 
             const card = document.createElement("article");
             card.className = `card ${isSold ? "sold" : ""} ${isReserved ? "reserved" : ""} ${isFuture ? "future" : ""}`;
+            card.dataset.id = item.id;
 
             const availabilityHtml = isFuture
                 ? `<p class="availability future">Available from ${item.date}</p>`
@@ -390,18 +454,24 @@
             const overlayHtml = (isSold || isReserved) ? `<div class="overlay"></div>` : "";
 
             let actionsHtml = "";
-            if (isReserved && data.isAdmin) {
+            if (isSold && data.isAdmin) {
                 actionsHtml = `
                     <div class="actions">
-                        <button class="btn btn-admin" onclick="cancelReservation('${item.id}', '${escapeHtml(item.name)}')">Cancel Reservation</button>
+                        <button class="btn btn-admin" data-no-select onclick="cancelReservation('${item.id}', '${escapeHtml(item.name)}')">Unsold</button>
+                    </div>
+                `;
+            } else if (isReserved && data.isAdmin) {
+                actionsHtml = `
+                    <div class="actions">
+                        <button class="btn btn-admin" data-no-select onclick="cancelReservation('${item.id}', '${escapeHtml(item.name)}')">Cancel Reservation</button>
                     </div>
                 `;
             } else if (!isSold) {
                 actionsHtml = `
                     <div class="actions">
-                        <button class="btn btn-whatsapp" onclick="contact('${item.id}', '${escapeHtml(item.name)}', 'wa', '${data.contact.whatsapp}')">WhatsApp</button>
-                        <button class="btn btn-telegram" onclick="contact('${item.id}', '${escapeHtml(item.name)}', 'tg', '${data.contact.telegram}')">Telegram</button>
-                        ${data.isAdmin ? `<button class="btn btn-admin" onclick="markSold('${item.id}', '${escapeHtml(item.name)}')">Mark Sold</button>` : ""}
+                        <button class="btn btn-whatsapp" data-no-select onclick="contact('${item.id}', '${escapeHtml(item.name)}', 'wa', '${data.contact.whatsapp}')">WhatsApp</button>
+                        <button class="btn btn-telegram" data-no-select onclick="contact('${item.id}', '${escapeHtml(item.name)}', 'tg', '${data.contact.telegram}')">Telegram</button>
+                        ${data.isAdmin ? `<button class="btn btn-admin" data-no-select onclick="markSold('${item.id}', '${escapeHtml(item.name)}')">Mark Sold</button>` : ""}
                     </div>
                 `;
             }
@@ -420,6 +490,11 @@
                 </div>
             `;
 
+            card.addEventListener("click", (e) => {
+                if (e.target.closest("[data-no-select]")) return;
+                toggleSelection(item.id, card);
+            });
+
             gridEl.appendChild(card);
         }
 
@@ -432,6 +507,46 @@
         function formatPrice(price) {
             const formatted = parseFloat(price).toFixed(2);
             return formatted.endsWith(".00") ? parseInt(price).toString() : formatted;
+        }
+
+        function toggleSelection(id, card) {
+            if (selectedItems.has(id)) {
+                selectedItems.delete(id);
+                card.classList.remove("selected");
+            } else {
+                selectedItems.add(id);
+                card.classList.add("selected");
+            }
+            updateSelectionBar();
+        }
+
+        function updateSelectionBar() {
+            const count = selectedItems.size;
+            selectionCountEl.textContent = count === 1 ? "1 item selected" : `${count} items selected`;
+            selectionBarEl.classList.toggle("visible", count > 0);
+        }
+
+        async function contactMultiple(type) {
+            const items = allItems.filter(item => selectedItems.has(item.id));
+            if (items.length === 0) return;
+
+            const lines = items.map(item => {
+                const price = formatPrice(item.price);
+                return `- [${item.id}] ${item.name} — ${price}€`;
+            });
+            const msg = encodeURIComponent(`I'm interested in:\n${lines.join("\n")}\n\nIf still available, when and where can I pick them up?`);
+
+            for (const id of selectedItems) {
+                await fetch(`${API_URL}?token=${token}&action=reserve&id=${id}`, { method: "POST" });
+            }
+
+            if (type === "wa") {
+                window.open(`https://wa.me/${contact.whatsapp}?text=${msg}`, "_blank");
+            } else {
+                await navigator.clipboard.writeText(decodeURIComponent(msg));
+                window.open(`https://t.me/${contact.telegram}`, "_blank");
+            }
+            location.reload();
         }
 
         async function contact(id, name, type, contactInfo) {
