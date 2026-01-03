@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moving Sale</title>
+    <style>
+        :root {
+            --bg: #fafafa;
+            --card-bg: #ffffff;
+            --text: #1a1a1a;
+            --text-light: #6b6b6b;
+            --accent: #2563eb;
+            --success: #22c55e;
+            --warning: #eab308;
+            --danger: #ef4444;
+            --border: #e5e5e5;
+            --whatsapp: #25D366;
+            --telegram: #0088cc;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+            padding: 16px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 32px;
+            padding: 24px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h1 {
+            font-size: 1.75rem;
+            font-weight: 600;
+            letter-spacing: -0.025em;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        @media (min-width: 640px) {
+            .grid {
+                grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+                gap: 24px;
+            }
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card.sold {
+            opacity: 0.7;
+        }
+
+        .image {
+            position: relative;
+            aspect-ratio: 4 / 3;
+            background: #e5e5e5;
+        }
+
+        .image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .price {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.25rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            z-index: 2;
+        }
+
+        .card.sold .overlay {
+            background: rgba(239, 68, 68, 0.92);
+            color: white;
+        }
+
+        .card.sold .overlay::after {
+            content: "Sold";
+        }
+
+        .card.reserved .overlay {
+            background: rgba(234, 179, 8, 0.9);
+            color: white;
+        }
+
+        .card.reserved .overlay::after {
+            content: "Reserved";
+        }
+
+        .content {
+            padding: 16px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .description {
+            font-size: 0.875rem;
+            color: var(--text-light);
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .availability {
+            font-size: 0.75rem;
+            color: var(--text-light);
+            margin-bottom: 12px;
+        }
+
+        .availability.available {
+            color: var(--success);
+        }
+
+        .availability.future {
+            color: var(--warning);
+        }
+
+        .actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: auto;
+        }
+
+        .btn {
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: opacity 0.15s;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .btn-whatsapp {
+            background: var(--whatsapp);
+            color: white;
+        }
+
+        .btn-telegram {
+            background: var(--telegram);
+            color: white;
+        }
+
+        .btn-admin {
+            grid-column: 1 / -1;
+            background: #1f1f1f;
+            color: white;
+            margin-top: 8px;
+        }
+
+        .loading, .error {
+            text-align: center;
+            padding: 48px 16px;
+            color: var(--text-light);
+        }
+
+        .error {
+            color: var(--danger);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 12px;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Moving Sale</h1>
+        </header>
+
+        <div id="loading" class="loading">Loading...</div>
+        <div id="error" class="error hidden"></div>
+        <div id="grid" class="grid hidden"></div>
+    </div>
+
+    <script>
+        const API_URL = "https://sale-api.mrbesher.workers.dev";
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get("token");
+
+        const loadingEl = document.getElementById("loading");
+        const errorEl = document.getElementById("error");
+        const gridEl = document.getElementById("grid");
+
+        async function init() {
+            if (!token) {
+                showError("Access denied. Token required.");
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}?token=${token}`);
+                if (!res.ok) {
+                    throw new Error("Invalid token");
+                }
+                const data = await res.json();
+                render(data);
+            } catch (e) {
+                showError(e.message);
+            }
+        }
+
+        function showError(msg) {
+            loadingEl.classList.add("hidden");
+            errorEl.textContent = msg;
+            errorEl.classList.remove("hidden");
+        }
+
+        function render(data) {
+            loadingEl.classList.add("hidden");
+            gridEl.classList.remove("hidden");
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            data.items.forEach(item => {
+                const itemDate = item.date ? new Date(item.date) : null;
+                const isFuture = itemDate && itemDate > today;
+                const isSold = item.status === "sold";
+                const isReserved = item.status === "reserved";
+
+                const card = document.createElement("article");
+                card.className = `card ${isSold ? "sold" : ""} ${isReserved ? "reserved" : ""}`;
+
+                const availabilityHtml = isFuture
+                    ? `<p class="availability future">Available from ${item.date}</p>`
+                    : `<p class="availability available">Available now</p>`;
+
+                const descriptionHtml = item.description
+                    ? `<p class="description">${escapeHtml(item.description)}</p>`
+                    : "";
+
+                const overlayHtml = (isSold || isReserved) ? `<div class="overlay"></div>` : "";
+
+                let actionsHtml = "";
+                if (!isSold) {
+                    actionsHtml = `
+                        <div class="actions">
+                            <button class="btn btn-whatsapp" onclick="contact('${item.id}', '${escapeHtml(item.name)}', 'wa', '${data.contact.whatsapp}')">WhatsApp</button>
+                            <button class="btn btn-telegram" onclick="contact('${item.id}', '${escapeHtml(item.name)}', 'tg', '${data.contact.telegram}')">Telegram</button>
+                            ${data.isAdmin ? `<button class="btn btn-admin" onclick="markSold('${item.id}', '${escapeHtml(item.name)}')">Mark Sold</button>` : ""}
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <div class="image">
+                        <img src="${item.imageUrl}" alt="${escapeHtml(item.name)}" loading="lazy">
+                        <span class="price">${formatPrice(item.price)}€</span>
+                        ${overlayHtml}
+                    </div>
+                    <div class="content">
+                        <h2 class="title">${escapeHtml(item.name)}</h2>
+                        ${descriptionHtml}
+                        ${availabilityHtml}
+                        ${actionsHtml}
+                    </div>
+                `;
+
+                gridEl.appendChild(card);
+            });
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement("div");
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function formatPrice(price) {
+            const formatted = parseFloat(price).toFixed(2);
+            return formatted.endsWith(".00") ? parseInt(price).toString() : formatted;
+        }
+
+        async function contact(id, name, type, contactInfo) {
+            await fetch(`${API_URL}?token=${token}&action=reserve&id=${id}`, { method: "POST" });
+            location.reload();
+
+            const msg = encodeURIComponent(`[${id}] ${name}\n\nIf still available, when and where can I pick it up?`);
+            if (type === "wa") {
+                window.open(`https://wa.me/${contactInfo}?text=${msg}`, "_blank");
+            } else if (type === "tg") {
+                window.open(`https://t.me/${contactInfo}`, "_blank");
+            }
+        }
+
+        async function markSold(id, name) {
+            if (!confirm(`Mark "${name}" as sold?`)) return;
+            await fetch(`${API_URL}?token=${token}&action=sell&id=${id}`, { method: "POST" });
+            location.reload();
+        }
+
+        init();
+    </script>
+</body>
+</html>
