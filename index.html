@@ -447,8 +447,8 @@
             card.dataset.id = item.id;
 
             const availabilityHtml = isFuture
-                ? `<p class="availability future">Available from ${item.date}</p>`
-                : `<p class="availability available">Available now</p>`;
+                ? `<p class="availability future"><strong>Available from</strong> ${item.date}</p>`
+                : "";
 
             const descriptionHtml = item.description
                 ? `<p class="description">${escapeHtml(item.description)}</p>`
